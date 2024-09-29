@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package network;
+
+option go_package = "github.com/painhardcore/SageSlayerServer/pkg/network";
+
+// Challenge message containing ECC parameters.
+message Challenge {
+  bytes qx = 1;           // Base point Qx
+  bytes qy = 2;           // Base point Qy
+  string curve = 3;       // Curve name (e.g., "P-256")
+  int32 difficulty = 4;   // Difficulty level
+}
+
+// Solution message containing client's solution to the challenge.
+message Solution {
+  bytes nonce = 1;
+}
+
+// Quote message containing the quote text.
+message Quote {
+  string text = 1;
+}
+
+// Error message containing an error description.
+message Error {
+  string message = 1;
+}
+
+// Enum for message types.
+enum MessageType {
+  CHALLENGE = 0;
+  SOLUTION = 1;
+  QUOTE = 2;
+  ERROR = 3;
+}
+
+// Wrapper message that includes the message type and payload.
+message Message {
+  MessageType type = 1;
+  bytes payload = 2;
+}
+
