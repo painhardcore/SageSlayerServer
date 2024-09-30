@@ -24,15 +24,15 @@ func NewClient(serverAddr string) *Client {
 }
 
 // RequestQuote connects to the server and requests a quote.
-func (c *Client) RequestQuote() error {
+// The 'silent' parameter controls whether the quote is printed.
+func (c *Client) RequestQuote(silent bool) error {
 	conn, err := net.Dial("tcp", c.ServerAddr)
 	if err != nil {
 		return fmt.Errorf("error connecting to server: %v", err)
 	}
 	defer conn.Close()
 
-	// Set read/write deadlines
-	// 30s should be enough
+	// Set read/write deadlines (30s should be enough)
 	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// Receive the challenge
@@ -48,12 +48,13 @@ func (c *Client) RequestQuote() error {
 
 	switch message.Type {
 	case network.MessageType_CHALLENGE:
+		// Proceed
 	case network.MessageType_ERROR:
 		errorProto := &network.Error{}
 		if err := proto.Unmarshal(message.Payload, errorProto); err != nil {
 			return fmt.Errorf("error unmarshalling error: %v", err)
 		}
-		return fmt.Errorf("error receiving the challenge: %s", errorProto)
+		return fmt.Errorf("error receiving the challenge: %s", errorProto.Message)
 	default:
 		return fmt.Errorf("invalid message type received")
 	}
@@ -64,7 +65,7 @@ func (c *Client) RequestQuote() error {
 		return fmt.Errorf("error unmarshalling challenge: %v", err)
 	}
 
-	// Step 2: Solve challenge
+	// Solve the challenge
 	nonce, err := pow.SolveChallenge(challengeProto)
 	if err != nil {
 		return fmt.Errorf("error solving challenge: %v", err)
@@ -85,10 +86,12 @@ func (c *Client) RequestQuote() error {
 	if err != nil {
 		return fmt.Errorf("error marshalling message: %v", err)
 	}
+
 	// Send the solution
 	if err := protocol.WriteMessage(conn, data); err != nil {
 		return fmt.Errorf("error sending solution: %v", err)
 	}
+
 	// Get the response
 	data, err = protocol.ReadMessage(conn)
 	if err != nil {
@@ -106,15 +109,17 @@ func (c *Client) RequestQuote() error {
 		if err := proto.Unmarshal(message.Payload, quoteProto); err != nil {
 			return fmt.Errorf("error unmarshalling quote: %v", err)
 		}
-		fmt.Println("Quote of the Day:", quoteProto.Text)
+		if !silent {
+			fmt.Println("Quote of the Day:", quoteProto.Text)
+		}
 	case network.MessageType_ERROR:
 		errorProto := &network.Error{}
 		if err := proto.Unmarshal(message.Payload, errorProto); err != nil {
 			return fmt.Errorf("error unmarshalling error message: %v", err)
 		}
-		fmt.Println("Error from server:", errorProto.Message)
+		return fmt.Errorf("error from server: %s", errorProto.Message)
 	default:
-		fmt.Println("Unexpected message type received")
+		return fmt.Errorf("unexpected message type received")
 	}
 
 	return nil
